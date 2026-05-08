@@ -7,19 +7,23 @@ const router = Router();
 
 const MintBody = z.object({
   swarmRef: z.string().min(1),
+  bundleRef: z.string().min(1),
   bundleHash: z.string().min(1),
   satSig: z.string().default('STUB'),
+  cosmoSig: z.string().default(''),
   attestation: z.string().default('MOCK'),
+  attestationType: z.number().int().min(0).max(1).default(0),
+  attestor: z.string().optional(),
+  capturedAt: z.number().int().nonnegative(),
+  mode: z.number().int().min(0).max(2),
   recipient: z.string().optional(),
 });
 
 /**
  * POST /api/mint
- * Body: { swarmRef, bundleHash, attestation, satSig?, recipient? }
- * Returns: { txHash, tokenId, ensName, stub }
- *
- * Final step in the pipeline. iOS calls this after /api/upload returns
- * a swarmRef, passing the App Attest assertion over the bundle hash.
+ * Body matches the RealityProof.sol mint() signature plus a few iOS
+ * convenience fields. iOS calls this after /api/upload (or skip-upload)
+ * with the App Attest assertion over the bundle hash.
  */
 router.post('/', async (req, res, next) => {
   try {
