@@ -6,6 +6,7 @@ import env from './config/env';
 import { requireApiKey } from './middleware/apiKey.middleware';
 import { errorHandler } from './middleware/error.middleware';
 import nonceRoutes from './routes/nonce.routes';
+import uploadRoutes from './routes/upload.routes';
 import logger from './utils/logger';
 
 declare module 'express' {
@@ -43,6 +44,7 @@ export function createApp(): Express {
   });
 
   app.use('/api/nonce', requireApiKey, nonceRoutes);
+  app.use('/api/upload', requireApiKey, uploadRoutes);
 
   app.use((_req, res) => {
     res.status(404).json({ error: { message: 'Route not found' } });
