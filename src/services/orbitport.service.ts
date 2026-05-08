@@ -93,12 +93,17 @@ export async function fetchCosmicNonce(): Promise<CosmicNonce> {
     };
   }
 
+  // No satellite signature = the cosmic-anchor claim isn't actually
+  // backed. Keep the real Orbitport nonce but flag stub=true so the
+  // verifier and iOS UI can render it as "not fully proven".
+  const hasSatSig = !!json.signature?.value;
+
   return {
     nonce: json.data,
     satSig: json.signature?.value ?? 'STUB',
     satPk: json.signature?.pk ?? 'STUB',
     src: json.src ?? 'unknown',
     expiresAt,
-    stub: false,
+    stub: !hasSatSig,
   };
 }
