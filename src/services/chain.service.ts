@@ -18,24 +18,36 @@ import logger from '../utils/logger';
  *
  * Each captured proof bundle becomes one ERC-721 token. The contract
  * stores commitments only; verification is off-chain in the viewer.
+ *
+ * Custom errors are listed so viem can decode reverts by name instead
+ * of opaque selectors like 0xfbce6490.
  */
 export const RealityProofAbi = parseAbi([
   'event RealityMinted(uint256 indexed tokenId, address indexed to, bytes32 indexed bundleHash, string swarmRef, string bundleRef, uint8 attestationType, address attestor, uint8 mode, uint64 capturedAt)',
   'function mint(address to, bytes32 bundleHash, string swarmRef, string bundleRef, bytes satSig, bytes cosmoSig, bytes attestation, uint8 attestationType, address attestor, uint64 capturedAt, uint8 mode) external returns (uint256)',
+  'error EmptySwarmRef()',
+  'error EmptyBundleRef()',
+  'error EmptySatSig()',
+  'error EmptyCosmoSig()',
+  'error EmptyAttestation()',
+  'error InvalidMode(uint8 mode)',
+  'error InvalidAttestationType(uint8 attestationType)',
+  'error DuplicateBundle(bytes32 hash, uint256 existingTokenId)',
+  'error AccessControlUnauthorizedAccount(address account, bytes32 neededRole)',
 ]);
 
 export interface MintInput {
   swarmRef: string;
   bundleRef: string;
   bundleHash: string;
-  satSig: string;            // hex from Orbitport (or 'STUB')
-  cosmoSig?: string;         // optional KMS co-sig, may be ''
-  attestation: string;       // base64 from App Attest (or 'MOCK')
-  attestationType: number;   // 0 = appAttest, 1 = deviceSE
-  attestor?: string;         // optional org address for deviceSE
-  capturedAt: number;        // unix seconds when the user pressed start
-  mode: number;              // 0 = roomPlan, 1 = objectCapture, 2 = stereoFusion
-  recipient?: string;        // defaults to the minter wallet
+  satSig: string;
+  cosmoSig?: string;
+  attestation: string;
+  attestationType: number;
+  attestor?: string;
+  capturedAt: number;
+  mode: number;
+  recipient?: string;
 }
 
 export interface MintResult {
@@ -46,6 +58,7 @@ export interface MintResult {
 }
 
 const ZERO_ADDRESS: Hex = '0x0000000000000000000000000000000000000000';
+const SENTINEL: Hex = '0x00';
 
 export async function mintRealityProof(input: MintInput): Promise<MintResult> {
   const stub = !env.MINTER_PRIVATE_KEY || !env.REALITY_PROOF_ADDRESS;
@@ -72,28 +85,39 @@ export async function mintRealityProof(input: MintInput): Promise<MintResult> {
 
   const recipient = (input.recipient ?? account.address) as Hex;
   const bundleHash = asHex(input.bundleHash);
-  const satSig = asBytes(input.satSig === 'STUB' ? '0x00' : input.satSig);
-  const cosmoSig = asBytes(input.cosmoSig ?? '');
-  const attestation = encodeAttestation(input.attestation);
+
+  // Contract reverts with EmptySatSig / EmptyAttestation if these are
+  // zero-length, so always pass at least one sentinel byte. The verifier
+  // off-chain treats 0x00 as "not yet anchored".
+  const satSig = nonEmptyBytes(input.satSig);
+  const attestation = nonEmptyBytes(encodeAttestation(input.attestation));
+  const cosmoSig = maybeEmptyBytes(input.cosmoSig ?? '');
   const attestor = (input.attestor ?? ZERO_ADDRESS) as Hex;
+
+  const args = [
+    recipient,
+    bundleHash,
+    input.swarmRef,
+    input.bundleRef,
+    satSig,
+    cosmoSig,
+    attestation,
+    input.attestationType,
+    attestor,
+    BigInt(input.capturedAt),
+    input.mode,
+  ] as const;
+
+  logger.info(
+    `mint() to=${recipient} bundleHash=${bundleHash} mode=${input.mode} ` +
+      `satSig=${satSig.length}b attestation=${attestation.length}b`,
+  );
 
   const txHash = await wallet.writeContract({
     address: env.REALITY_PROOF_ADDRESS as Hex,
     abi: RealityProofAbi,
     functionName: 'mint',
-    args: [
-      recipient,
-      bundleHash,
-      input.swarmRef,
-      input.bundleRef,
-      satSig,
-      cosmoSig,
-      attestation,
-      input.attestationType,
-      attestor,
-      BigInt(input.capturedAt),
-      input.mode,
-    ],
+    args,
   });
 
   const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -122,21 +146,28 @@ function asHex(value: string): Hex {
   return (value.startsWith('0x') ? value : `0x${value}`) as Hex;
 }
 
-/** Coerces "stub", '', '0x...', or raw hex to a non-empty hex bytes value. */
-function asBytes(value: string): Hex {
+/** Coerces falsy / placeholder strings ('STUB', 'MOCK', '', '0x') to a
+ *  one-byte sentinel so the contract's length-check passes. */
+function nonEmptyBytes(value: string): Hex {
+  if (!value || value === 'STUB' || value === 'MOCK' || value === '0x') {
+    return SENTINEL;
+  }
+  const hex = asHex(value);
+  return hex === '0x' ? SENTINEL : hex;
+}
+
+/** For fields the contract allows to be empty (cosmoSig). */
+function maybeEmptyBytes(value: string): Hex {
   if (!value || value === 'STUB' || value === 'MOCK') return '0x';
   return asHex(value);
 }
 
-function encodeAttestation(value: string): Hex {
-  if (!value || value === 'MOCK') {
-    // Contract requires non-empty attestation, so use a single sentinel byte.
-    return '0x00';
-  }
+function encodeAttestation(value: string): string {
+  if (!value || value === 'MOCK') return '';
   try {
     const buf = Buffer.from(value, 'base64');
-    return `0x${buf.toString('hex')}` as Hex;
+    return `0x${buf.toString('hex')}`;
   } catch {
-    return '0x00';
+    return '';
   }
 }
