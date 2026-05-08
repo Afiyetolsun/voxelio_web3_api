@@ -32,7 +32,7 @@ export async function pinToSwarm(
       'Content-Type': contentType,
       'swarm-postage-batch-id': env.SWARM_POSTAGE_BATCH_ID,
     },
-    body: buffer,
+    body: new Uint8Array(buffer),
   });
 
   if (!response.ok) {
