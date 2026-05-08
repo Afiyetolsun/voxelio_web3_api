@@ -75,17 +75,29 @@ export async function fetchCosmicNonce(): Promise<CosmicNonce> {
   }
 
   const json = (await response.json()) as {
-    service: string;
-    src: string;
-    data: string;
-    signature: { value: string; pk: string };
+    service?: string;
+    src?: string;
+    data?: string;
+    signature?: { value?: string; pk?: string };
   };
+
+  if (!json?.data) {
+    logger.warn('Orbitport response missing data — falling back to stub', json);
+    return {
+      nonce: randomBytes(32).toString('hex'),
+      satSig: 'STUB',
+      satPk: 'STUB',
+      src: 'stub',
+      expiresAt,
+      stub: true,
+    };
+  }
 
   return {
     nonce: json.data,
-    satSig: json.signature.value,
-    satPk: json.signature.pk,
-    src: json.src,
+    satSig: json.signature?.value ?? 'STUB',
+    satPk: json.signature?.pk ?? 'STUB',
+    src: json.src ?? 'unknown',
     expiresAt,
     stub: false,
   };
