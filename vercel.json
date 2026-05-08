@@ -1,0 +1,25 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm run type-check",
+  "functions": {
+    "api/index.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/root.ts"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/api/root.ts"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.ts"
+    }
+  ]
+}

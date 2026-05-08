@@ -1,0 +1,32 @@
+{
+  "name": "voxelio-web3-api",
+  "version": "0.1.0",
+  "description": "Voxelio Web3 — Vercel relay for Proof of Reality (cosmic nonce, Swarm pinning, on-chain mint)",
+  "main": "dist/src/index.js",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/dev.ts",
+    "start": "node dist/src/dev.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vercel/node": "^5.7.15",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "multer": "^1.4.5-lts.1",
+    "viem": "^2.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.28.2"
+}
