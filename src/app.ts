@@ -3,7 +3,9 @@ import cors from 'cors';
 import express, { Express, NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import env from './config/env';
+import { requireApiKey } from './middleware/apiKey.middleware';
 import { errorHandler } from './middleware/error.middleware';
+import nonceRoutes from './routes/nonce.routes';
 import logger from './utils/logger';
 
 declare module 'express' {
@@ -39,6 +41,8 @@ export function createApp(): Express {
       timestamp: new Date().toISOString(),
     });
   });
+
+  app.use('/api/nonce', requireApiKey, nonceRoutes);
 
   app.use((_req, res) => {
     res.status(404).json({ error: { message: 'Route not found' } });
